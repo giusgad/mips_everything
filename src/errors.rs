@@ -17,4 +17,6 @@ pub struct LexerError {
 pub enum LexerErrorKind {
     #[error("Invalid register: \"{0}\"")]
     RegisterParseError(String),
+    #[error("Invalid token, couldn't read: \"{0}\"")]
+    InvalidToken(char),
 }
