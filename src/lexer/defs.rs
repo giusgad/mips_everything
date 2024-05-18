@@ -1,8 +1,7 @@
+use self::register::Register;
 use crate::errors::LexerErrorKind;
 
-use self::register::Register;
-
-mod register;
+pub mod register;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {

@@ -1,3 +1,4 @@
+use crate::lexer::defs::register::RegisterParseError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,7 +17,7 @@ pub struct LexerError {
 #[derive(Debug, Error)]
 pub enum LexerErrorKind {
     #[error("Invalid register: \"{0}\"")]
-    RegisterParseError(String),
+    Register(#[from] RegisterParseError),
     #[error("Invalid token, couldn't read: \"{0}\"")]
     InvalidToken(char),
 }

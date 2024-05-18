@@ -1,4 +1,4 @@
-mod defs;
+pub mod defs;
 
 pub struct Lexer {
     pos: usize,
