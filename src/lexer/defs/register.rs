@@ -11,7 +11,7 @@ pub struct RegisterParseError {
     reg: String,
 }
 #[derive(Debug, Error, Eq, PartialEq)]
-enum RegisterParseErrorKind {
+pub enum RegisterParseErrorKind {
     #[error("\"{0}\" is not a valid register prefix, must be one of 'v','a','t','s','k'")]
     InvalidPrefix(char),
     #[error("\"{0}\" is not a valid register index, {REG_MUST_BE}")]
@@ -20,7 +20,6 @@ enum RegisterParseErrorKind {
     OutOfRange(u8),
 }
 
-#[allow(private_interfaces)]
 #[derive(Debug, PartialEq, Eq)]
 /// Identifies a valid register in the CPU
 pub enum Register {
@@ -63,16 +62,22 @@ impl TryFrom<&[char]> for Register {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct RegisterPrefixedName {
+pub struct RegisterPrefixedName {
     /// The prefix of the register alias, can be one of 'v','a','t','s','k'
     prefix: char,
     /// The number after the prefix
     index: u8,
 }
 
+impl RegisterPrefixedName {
+    pub fn new_unchecked(prefix: char, index: u8) -> Self {
+        //TODO: validation
+        Self { prefix, index }
+    }
+}
+
 impl TryFrom<&[char]> for RegisterPrefixedName {
     type Error = RegisterParseErrorKind;
-
     fn try_from(chars: &[char]) -> Result<Self, Self::Error> {
         // there must to be at least 2 chars: ['s','7']
         assert!(chars.len() >= 2);
@@ -118,7 +123,7 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
 #[derive(Debug, PartialEq, Eq, EnumString)]
 #[strum(serialize_all = "lowercase")]
 /// register name
-enum RegisterName {
+pub enum RegisterName {
     At,
     Gp,
     Sp,

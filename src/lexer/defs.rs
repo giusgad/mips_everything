@@ -18,28 +18,33 @@ pub enum Token {
     Plus,        // +
     Minus,       // -
     Comma,       // ,
+    Dot,         // .
     Colon,       // :
     Backslash,   // \\
 
     Register(Register),
+    Ident(String),
+    String(String),
+    Number(i64),
 }
 
-impl TryFrom<char> for Token {
+impl TryFrom<u8> for Token {
     type Error = LexerErrorKind;
 
-    fn try_from(value: char) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         let tok = match value {
-            '(' => Token::LParen,
-            ')' => Token::RParen,
-            '"' => Token::DoubleQuote,
-            '\'' => Token::SingleQuote,
-            '#' => Token::Sharp,
-            '+' => Token::Plus,
-            '-' => Token::Minus,
-            ',' => Token::Comma,
-            ':' => Token::Colon,
-            '\\' => Token::Backslash,
-            c => return Err(LexerErrorKind::InvalidToken(c)),
+            b'(' => Token::LParen,
+            b')' => Token::RParen,
+            b'"' => Token::DoubleQuote,
+            b'\'' => Token::SingleQuote,
+            b'#' => Token::Sharp,
+            b'+' => Token::Plus,
+            b'-' => Token::Minus,
+            b',' => Token::Comma,
+            b':' => Token::Colon,
+            b'.' => Token::Dot,
+            b'\\' => Token::Backslash,
+            c => return Err(LexerErrorKind::InvalidToken(c.into())),
         };
         Ok(tok)
     }
