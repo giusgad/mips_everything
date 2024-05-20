@@ -20,4 +20,6 @@ pub enum LexerErrorKind {
     Register(#[from] RegisterParseError),
     #[error("Invalid token, couldn't read: \"{0}\"")]
     InvalidToken(char),
+    #[error("Expected string closing delimiter")]
+    ExpectedStringEnd,
 }

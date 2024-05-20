@@ -1,12 +1,16 @@
+#![allow(dead_code)]
+use self::defs::{register::Register, Token};
 use crate::errors::LexerErrorKind;
 
-use self::defs::{register::Register, Token};
 pub mod defs;
 
 #[derive(Debug)]
 pub struct Lexer {
     pos: usize,
+    /// encountered a ", next token is going to be a string
     in_string: bool,
+    /// last token was a string
+    returned_string: bool,
     input: Vec<u8>,
 }
 
@@ -16,41 +20,42 @@ impl Lexer {
             pos: 0,
             input: input.into_bytes(),
             in_string: false,
+            returned_string: false,
         }
     }
 
     fn next_token(&mut self) -> Result<Token, LexerErrorKind> {
-        if self.in_string {
+        if self.in_string && !self.returned_string {
+            self.returned_string = true;
             return Ok(Token::String(self.read_string()?));
         }
         self.skip_whitespace();
         let Some(curr) = self.peek() else {
             return Ok(Token::Eof);
         };
-        if let Ok(tok) = curr.try_into() {
-            match tok {
-                Token::DoubleQuote => {
-                    self.in_string = true;
-                }
-                Token::Backslash => {
-                    // WARN: unsure if this works
-                    let Some(next) = self.read_next() else {
-                        todo!() //error
-                    };
-                    return next.try_into();
-                }
-                t => {
-                    self.read_next();
-                    return Ok(t);
-                }
-            };
-        }
-        match curr {
-            b'a'..=b'z' | b'A'..=b'Z' => self.read_ident(),
-            b'0'..=b'9' | b'-' => self.read_number(),
-            b'$' => self.read_register(),
-            _ => curr.try_into(),
-        }
+        let res = match curr {
+            b'(' => Ok(Token::LParen),
+            b')' => Ok(Token::RParen),
+            b'"' => {
+                self.returned_string = false;
+                self.in_string = !self.in_string;
+                Ok(Token::DoubleQuote)
+            }
+            b'\'' => Ok(Token::SingleQuote),
+            b'#' => Ok(Token::Sharp),
+            b'+' => Ok(Token::Plus),
+            b'-' => Ok(Token::Minus),
+            b',' => Ok(Token::Comma),
+            b':' => Ok(Token::Colon),
+            b'.' => Ok(Token::Dot),
+            b'\\' => Ok(Token::Backslash), // TODO: escaping
+            b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident(),
+            b'0'..=b'9' => return self.read_number(),
+            b'$' => return self.read_register(),
+            c => Err(LexerErrorKind::InvalidToken(c.into())),
+        };
+        self.read_next();
+        res
     }
 
     /// Increments the position until the next character to be read is not whitespace
@@ -79,8 +84,24 @@ impl Lexer {
     }
 
     fn read_string(&mut self) -> Result<String, LexerErrorKind> {
-        todo!();
+        let mut string = String::new();
+        let mut escaped = false;
+        while let Some(c) = self.peek() {
+            if c == b'"' {
+                if escaped {
+                    escaped = false;
+                } else {
+                    break;
+                }
+            } else if c == b'\\' {
+                escaped = true;
+            }
+            self.read_next();
+            string.push(c as char)
+        }
+        Ok(string)
     }
+
     fn read_ident(&mut self) -> Result<Token, LexerErrorKind> {
         let mut string = String::new();
         while let Some(c) = self.peek() {
@@ -102,7 +123,7 @@ impl Lexer {
             string.push(c as char);
         }
         // TODO: parse also bin and hex
-        if let Ok(num) = string.parse::<i64>() {
+        if let Ok(num) = string.parse::<u64>() {
             Ok(Token::Number(num))
         } else {
             //TODO: correct error
@@ -134,10 +155,8 @@ mod test {
         let input = ".data
 x: .word 7
 y: .word 3
-
 .text
 la $s0 x
-
 la $a0 mylabel
 li $v0 4
 syscall			
@@ -178,12 +197,35 @@ syscall
         let mut lexer = Lexer::new(input.into());
         for res in tokens.into_iter() {
             assert_eq!(lexer.next_token().unwrap(), res);
-            dbg!(res);
         }
         assert_eq!(lexer.next_token().unwrap(), Token::Eof);
     }
     #[test]
     fn read_strings() {
-        //TODO: test
+        let input = r#"
+        data "inside string"
+        out "inside \" escaped"
+        double "inside\"some\"double"
+        "#;
+        let tokens = [
+            Token::Ident("data".into()),
+            Token::DoubleQuote,
+            Token::String("inside string".into()),
+            Token::DoubleQuote,
+            Token::Ident("out".into()),
+            Token::DoubleQuote,
+            Token::String("inside \\\" escaped".into()),
+            Token::DoubleQuote,
+            Token::Ident("double".into()),
+            Token::DoubleQuote,
+            Token::String("inside\\\"some\\\"double".into()),
+            Token::DoubleQuote,
+        ];
+        let mut lexer = Lexer::new(input.into());
+        for res in tokens.into_iter() {
+            assert_eq!(lexer.next_token().unwrap(), res);
+            dbg!(res);
+        }
+        assert_eq!(lexer.next_token().unwrap(), Token::Eof);
     }
 }
