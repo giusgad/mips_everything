@@ -2,22 +2,19 @@ use std::str::FromStr;
 use strum::EnumString;
 use thiserror::Error;
 
-const REG_MUST_BE: &str = "must be $0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0-$v1";
+const REG_MUST_BE: &str =
+    "must be $0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0-$v1 or $ra,$at,$gp,$sp,$fp.";
 
 #[derive(Debug, Error, Eq, PartialEq)]
-#[error("Couldn't parse \"{reg}\", {kind}.")]
-pub(crate) struct RegisterParseError {
-    pub kind: RegisterParseErrorKind,
-    pub reg: String,
-}
-#[derive(Debug, Error, Eq, PartialEq)]
-pub(crate) enum RegisterParseErrorKind {
+pub(crate) enum RegisterParseError {
     #[error("\"{0}\" is not a valid register prefix, must be one of 'v','a','t','s','k'")]
     InvalidPrefix(char),
     #[error("\"{0}\" is not a valid register index, {REG_MUST_BE}")]
     InvalidIndex(String),
     #[error("Register number is out of range, {REG_MUST_BE}")]
     OutOfRange(u8),
+    #[error("Couldn't parse register: \"{0}\", {REG_MUST_BE}")]
+    Other(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,21 +40,18 @@ impl TryFrom<&[char]> for Register {
         // try to parse the register as a number $0-$31
         if let Ok(num) = reg_string.parse::<u8>() {
             if num >= 32 {
-                return Err(RegisterParseError {
-                    kind: RegisterParseErrorKind::OutOfRange(num),
-                    reg: reg_string,
-                });
+                return Err(RegisterParseError::OutOfRange(num));
             }
             return Ok(Register::Number(num));
         }
-        // try to parse the register as a prefixed alias like $v0,$s3...
-        match RegisterPrefixedName::try_from(value) {
-            Ok(reg) => Ok(Register::PrefixedNumber(reg)),
-            Err(kind) => Err(RegisterParseError {
-                kind,
-                reg: reg_string,
-            }),
+        if value.len() == 2 {
+            // try to parse the register as a prefixed alias like $v0,$s3...
+            return match RegisterPrefixedName::try_from(value) {
+                Ok(reg) => Ok(Register::PrefixedNumber(reg)),
+                Err(err) => Err(err),
+            };
         }
+        Err(RegisterParseError::Other(reg_string))
     }
 }
 
@@ -77,17 +71,13 @@ impl RegisterPrefixedName {
 }
 
 impl TryFrom<&[char]> for RegisterPrefixedName {
-    type Error = RegisterParseErrorKind;
+    type Error = RegisterParseError;
     fn try_from(chars: &[char]) -> Result<Self, Self::Error> {
-        // there must to be at least 2 chars: ['s','7']
-        assert!(chars.len() >= 2);
-        // if there is more than 2 chars, the number can't be valid since all register numbers only
-        // have one digit (max is 9 for $t9)
-        if chars.len() > 2 {
-            return Err(RegisterParseErrorKind::InvalidIndex(String::from_iter(
-                &chars[1..],
-            )));
+        // there must be exactly 2 chars: ['s','7']
+        if chars.len() != 2 {
+            return Err(RegisterParseError::Other(String::from_iter(chars)));
         }
+
         let mut res = RegisterPrefixedName {
             prefix: ' ',
             index: 0,
@@ -95,7 +85,7 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
         // get the prefix of the register
         res.prefix = match chars[0] {
             c @ ('v' | 'a' | 't' | 's' | 'k') => c,
-            c => return Err(RegisterParseErrorKind::InvalidPrefix(c)),
+            c => return Err(RegisterParseError::InvalidPrefix(c)),
         };
         // try to parse the index
         if let Some(index) = chars[1].to_digit(10) {
@@ -110,11 +100,11 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
                 _ => unreachable!(),
             };
             if index > max {
-                return Err(RegisterParseErrorKind::OutOfRange(index as u8));
+                return Err(RegisterParseError::OutOfRange(index as u8));
             }
             res.index = index as u8;
         } else {
-            return Err(RegisterParseErrorKind::InvalidIndex(chars[1].into()));
+            return Err(RegisterParseError::Other(String::from_iter(chars)));
         }
         Ok(res)
     }
@@ -153,7 +143,7 @@ mod test {
         for (s, idx) in out_of_range {
             assert_eq!(
                 RegisterPrefixedName::try_from(s.chars().collect::<Vec<char>>().as_slice()),
-                Err(RegisterParseErrorKind::OutOfRange(idx))
+                Err(RegisterParseError::OutOfRange(idx))
             );
         }
         let more_errs = ["s9", "r3", "g3", "s12"];

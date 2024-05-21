@@ -44,7 +44,8 @@ impl Lexer {
                         .iter()
                         .take(self.pos)
                         .filter(|&c| *c == 0xA)
-                        .count();
+                        .count()
+                        + 1;
                     return Err(LexerError { kind: err, line });
                 }
             }
@@ -190,7 +191,7 @@ impl Lexer {
 
 #[cfg(test)]
 mod test {
-    use test::defs::register::{RegisterName, RegisterParseError, RegisterParseErrorKind};
+    use test::defs::register::{RegisterName, RegisterParseError};
 
     use self::defs::register::RegisterPrefixedName;
 
@@ -295,10 +296,7 @@ test";
         assert_eq!(
             lexer.lex(),
             Err(LexerError {
-                kind: LexerErrorKind::Register(RegisterParseError {
-                    kind: RegisterParseErrorKind::InvalidPrefix('c'),
-                    reg: "".into(),
-                }),
+                kind: LexerErrorKind::Register(RegisterParseError::Other("error".into())),
                 line: 3
             })
         )

@@ -1,5 +1,4 @@
 use self::register::Register;
-use crate::errors::LexerErrorKind;
 
 pub mod register;
 
