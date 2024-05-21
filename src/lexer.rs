@@ -86,18 +86,27 @@ impl Lexer {
     fn read_string(&mut self) -> Result<String, LexerErrorKind> {
         let mut string = String::new();
         let mut escaped = false;
+        //TODO: special chars like \n
         while let Some(c) = self.peek() {
-            if c == b'"' {
-                if escaped {
-                    escaped = false;
-                } else {
-                    break;
-                }
+            if escaped {
+                escaped = false;
+                string.push(c as char);
+                self.read_next();
+                continue;
+            } else if c == b'"' {
+                break;
             } else if c == b'\\' {
                 escaped = true;
+                self.read_next();
+                continue;
             }
             self.read_next();
             string.push(c as char)
+        }
+        // self.peek() should be '"' because the next token will be a closing quote,
+        // if it's not the string is not closed and it's an error
+        if self.peek() != Some(b'"') {
+            return Err(LexerErrorKind::ExpectedStringEnd);
         }
         Ok(string)
     }
@@ -214,18 +223,21 @@ syscall
             Token::DoubleQuote,
             Token::Ident("out".into()),
             Token::DoubleQuote,
-            Token::String("inside \\\" escaped".into()),
+            Token::String("inside \" escaped".into()),
             Token::DoubleQuote,
             Token::Ident("double".into()),
             Token::DoubleQuote,
-            Token::String("inside\\\"some\\\"double".into()),
+            Token::String("inside\"some\"double".into()),
             Token::DoubleQuote,
         ];
         let mut lexer = Lexer::new(input.into());
         for res in tokens.into_iter() {
             assert_eq!(lexer.next_token().unwrap(), res);
-            dbg!(res);
         }
         assert_eq!(lexer.next_token().unwrap(), Token::Eof);
+        let mut lexer = Lexer::new("\"Open string".into());
+        assert_eq!(lexer.next_token(), Ok(Token::DoubleQuote));
+        assert_eq!(lexer.next_token(), Err(LexerErrorKind::ExpectedStringEnd));
+        assert_eq!(lexer.next_token(), Ok(Token::Eof));
     }
 }

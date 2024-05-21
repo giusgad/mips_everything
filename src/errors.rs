@@ -14,7 +14,7 @@ pub struct LexerError {
     line: usize,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum LexerErrorKind {
     #[error("Invalid register: \"{0}\"")]
     Register(#[from] RegisterParseError),
