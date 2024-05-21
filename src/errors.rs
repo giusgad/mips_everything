@@ -7,11 +7,11 @@ pub enum CompileError {
     Lexer(#[from] LexerError),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 #[error("at line {line}\n{kind}")]
 pub struct LexerError {
-    kind: LexerErrorKind,
-    line: usize,
+    pub kind: LexerErrorKind,
+    pub line: usize,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

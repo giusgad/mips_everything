@@ -6,12 +6,12 @@ const REG_MUST_BE: &str = "must be $0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0
 
 #[derive(Debug, Error, Eq, PartialEq)]
 #[error("Couldn't parse \"{reg}\", {kind}.")]
-pub struct RegisterParseError {
-    kind: RegisterParseErrorKind,
-    reg: String,
+pub(crate) struct RegisterParseError {
+    pub kind: RegisterParseErrorKind,
+    pub reg: String,
 }
 #[derive(Debug, Error, Eq, PartialEq)]
-pub enum RegisterParseErrorKind {
+pub(crate) enum RegisterParseErrorKind {
     #[error("\"{0}\" is not a valid register prefix, must be one of 'v','a','t','s','k'")]
     InvalidPrefix(char),
     #[error("\"{0}\" is not a valid register index, {REG_MUST_BE}")]
@@ -22,7 +22,7 @@ pub enum RegisterParseErrorKind {
 
 #[derive(Debug, PartialEq, Eq)]
 /// Identifies a valid register in the CPU
-pub enum Register {
+pub(crate) enum Register {
     /// Register Identified directly by number
     Number(u8),
     /// Register Identified by letter+number like `$s1` or `$t1`
@@ -62,7 +62,7 @@ impl TryFrom<&[char]> for Register {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct RegisterPrefixedName {
+pub(crate) struct RegisterPrefixedName {
     /// The prefix of the register alias, can be one of 'v','a','t','s','k'
     prefix: char,
     /// The number after the prefix
@@ -70,7 +70,7 @@ pub struct RegisterPrefixedName {
 }
 
 impl RegisterPrefixedName {
-    pub fn new_unchecked(prefix: char, index: u8) -> Self {
+    pub(crate) fn new_unchecked(prefix: char, index: u8) -> Self {
         //TODO: validation
         Self { prefix, index }
     }
@@ -123,7 +123,7 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
 #[derive(Debug, PartialEq, Eq, EnumString)]
 #[strum(serialize_all = "lowercase")]
 /// register name
-pub enum RegisterName {
+pub(crate) enum RegisterName {
     At,
     Gp,
     Sp,

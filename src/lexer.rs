@@ -1,12 +1,13 @@
 #![allow(dead_code)]
 use self::defs::{register::Register, Token};
-use crate::errors::LexerErrorKind;
+use crate::errors::{LexerError, LexerErrorKind};
 
 pub mod defs;
 
 #[derive(Debug)]
 pub struct Lexer {
     pos: usize,
+    line: usize,
     /// encountered a ", next token is going to be a string
     in_string: bool,
     /// last token was a string
@@ -18,9 +19,35 @@ impl Lexer {
     fn new(input: String) -> Self {
         Lexer {
             pos: 0,
+            line: 0,
             input: input.into_bytes(),
             in_string: false,
             returned_string: false,
+        }
+    }
+
+    /// returns a Vec of all the tokens from the input
+    pub fn lex(&mut self) -> Result<Vec<Token>, LexerError> {
+        let mut res = Vec::new();
+        loop {
+            match self.next_token() {
+                Ok(tok) => {
+                    if tok == Token::Eof {
+                        res.push(tok);
+                        return Ok(res);
+                    }
+                    res.push(tok)
+                }
+                Err(err) => {
+                    let line = self
+                        .input
+                        .iter()
+                        .take(self.pos)
+                        .filter(|&c| *c == 0xA)
+                        .count();
+                    return Err(LexerError { kind: err, line });
+                }
+            }
         }
     }
 
@@ -73,7 +100,7 @@ impl Lexer {
             Some(self.input[self.pos])
         }
     }
-    /// reads the next byte and increment `self.pos`
+    /// Reads the next byte and increment `self.pos`
     fn read_next(&mut self) -> Option<u8> {
         if self.pos >= self.input.len() {
             None
@@ -83,13 +110,15 @@ impl Lexer {
         }
     }
 
+    /// Reads a string, stops when a non escaped closing quote is found, returns an error if the
+    /// closing delimiter doesn't exist
     fn read_string(&mut self) -> Result<String, LexerErrorKind> {
         let mut string = String::new();
         let mut escaped = false;
-        //TODO: special chars like \n
         while let Some(c) = self.peek() {
             if escaped {
                 escaped = false;
+                //TODO: special chars like \n
                 string.push(c as char);
                 self.read_next();
                 continue;
@@ -103,7 +132,7 @@ impl Lexer {
             self.read_next();
             string.push(c as char)
         }
-        // self.peek() should be '"' because the next token will be a closing quote,
+        // Self.peek() should be '"' because the next token will be a closing quote,
         // if it's not the string is not closed and it's an error
         if self.peek() != Some(b'"') {
             return Err(LexerErrorKind::ExpectedStringEnd);
@@ -111,6 +140,7 @@ impl Lexer {
         Ok(string)
     }
 
+    /// Reads an ident, keeps going until an ascii whitespace character is found
     fn read_ident(&mut self) -> Result<Token, LexerErrorKind> {
         let mut string = String::new();
         while let Some(c) = self.peek() {
@@ -122,6 +152,7 @@ impl Lexer {
         }
         Ok(Token::Ident(string))
     }
+
     fn read_number(&mut self) -> Result<Token, LexerErrorKind> {
         let mut string = String::new();
         while let Some(c) = self.peek() {
@@ -139,6 +170,9 @@ impl Lexer {
             Err(LexerErrorKind::InvalidToken('c'))
         }
     }
+
+    /// Reads a register starting from a dollar sign, returning a [`Token::Register`], containing the representation of the
+    /// register following the $
     fn read_register(&mut self) -> Result<Token, LexerErrorKind> {
         let mut chars = Vec::new();
         // skip the $ itself
@@ -156,6 +190,8 @@ impl Lexer {
 
 #[cfg(test)]
 mod test {
+    use test::defs::register::{RegisterName, RegisterParseError, RegisterParseErrorKind};
+
     use self::defs::register::RegisterPrefixedName;
 
     use super::*;
@@ -239,5 +275,32 @@ syscall
         assert_eq!(lexer.next_token(), Ok(Token::DoubleQuote));
         assert_eq!(lexer.next_token(), Err(LexerErrorKind::ExpectedStringEnd));
         assert_eq!(lexer.next_token(), Ok(Token::Eof));
+    }
+    #[test]
+    fn lex() {
+        let input = "lw $ra 4";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![
+            Token::Ident("lw".into()),
+            Token::Register(Register::Name(RegisterName::Ra)),
+            Token::Number(4),
+            Token::Eof,
+        ];
+        assert_eq!(lexer.lex(), Ok(tokens));
+        let input = "lw 4
+iden
+lw $error
+test";
+        let mut lexer = Lexer::new(input.into());
+        assert_eq!(
+            lexer.lex(),
+            Err(LexerError {
+                kind: LexerErrorKind::Register(RegisterParseError {
+                    kind: RegisterParseErrorKind::InvalidPrefix('c'),
+                    reg: "".into(),
+                }),
+                line: 3
+            })
+        )
     }
 }
