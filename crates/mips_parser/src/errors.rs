@@ -5,10 +5,12 @@ use thiserror::Error;
 pub enum CompileError {
     #[error("Syntax error {0}")]
     Lexer(#[from] LexerError),
+    // #[error("Parsing error: {0}")]
+    // Parser(#[from] ParserError)
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("at line {line}\n{kind}")]
+#[error("in line {line}:\n{kind}")]
 pub struct LexerError {
     pub kind: LexerErrorKind,
     pub line: usize,

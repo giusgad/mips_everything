@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use self::defs::{register::Register, Token};
 use crate::errors::{LexerError, LexerErrorKind};
 
@@ -190,10 +189,9 @@ impl Lexer {
 }
 
 #[cfg(test)]
-mod test {
-    use test::defs::register::{RegisterName, RegisterParseError};
-
-    use self::defs::register::RegisterPrefixedName;
+mod tests {
+    use crate::lexer::defs::register::RegisterParseError;
+    use crate::lexer::defs::register::{RegisterName, RegisterPrefixedName};
 
     use super::*;
     #[test]

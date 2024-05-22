@@ -122,7 +122,7 @@ pub(crate) enum RegisterName {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     #[test]
     fn prefixed_name() {
