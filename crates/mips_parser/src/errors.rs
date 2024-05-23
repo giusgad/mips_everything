@@ -24,4 +24,8 @@ pub enum LexerErrorKind {
     InvalidToken(char),
     #[error("Expected string closing delimiter")]
     ExpectedStringEnd,
+    #[error("Number literal \"{0}\" is invalid.")]
+    NumberParseError(String),
+    #[error("Number out of range \"{0}\", must be between -32768 and 32767")]
+    NumberOutOfRange(String),
 }

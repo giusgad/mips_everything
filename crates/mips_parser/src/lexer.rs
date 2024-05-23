@@ -1,3 +1,5 @@
+use std::num::IntErrorKind;
+
 use self::defs::{register::Register, Token};
 use crate::errors::{LexerError, LexerErrorKind};
 
@@ -163,11 +165,14 @@ impl Lexer {
             string.push(c as char);
         }
         // TODO: parse also bin and hex
-        if let Ok(num) = string.parse::<u64>() {
-            Ok(Token::Number(num))
-        } else {
-            //TODO: correct error
-            Err(LexerErrorKind::InvalidToken('c'))
+        match string.parse::<i16>() {
+            Ok(num) => Ok(Token::Number(num)),
+            Err(err) => match err.kind() {
+                IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
+                    Err(LexerErrorKind::NumberOutOfRange(string))
+                }
+                _ => Err(LexerErrorKind::NumberParseError(string)),
+            },
         }
     }
 
@@ -298,5 +303,22 @@ test";
                 line: 3
             })
         )
+    }
+    #[test]
+    fn parse_numbers() {
+        let mut lexer = Lexer::new("3 12 4".into());
+        let tokens = vec![
+            Token::Number(3),
+            Token::Number(12),
+            Token::Number(4),
+            Token::Eof,
+        ];
+        assert_eq!(lexer.lex().unwrap(), tokens);
+
+        let strs = ["3a", "32768"];
+        for s in strs {
+            let mut lexer = Lexer::new(s.into());
+            assert!(lexer.lex().is_err());
+        }
     }
 }

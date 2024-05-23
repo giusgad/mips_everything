@@ -65,7 +65,6 @@ pub(crate) struct RegisterPrefixedName {
 
 impl RegisterPrefixedName {
     pub(crate) fn new_unchecked(prefix: char, index: u8) -> Self {
-        //TODO: validation
         Self { prefix, index }
     }
 }

@@ -24,5 +24,5 @@ pub enum Token {
     Register(Register),
     Ident(String),
     String(String),
-    Number(u64),
+    Number(i16),
 }
