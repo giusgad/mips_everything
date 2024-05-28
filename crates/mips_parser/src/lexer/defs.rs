@@ -1,9 +1,9 @@
 use self::register::Register;
 
-pub mod register;
+pub(crate) mod register;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Token {
+pub(crate) enum Token {
     Eof,
     Newline,
 

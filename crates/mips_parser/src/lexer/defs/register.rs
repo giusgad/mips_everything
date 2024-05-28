@@ -6,7 +6,7 @@ const REG_MUST_BE: &str =
     "must be $0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0-$v1 or $ra,$at,$gp,$sp,$fp.";
 
 #[derive(Debug, Error, Eq, PartialEq)]
-pub(crate) enum RegisterParseError {
+pub enum RegisterParseError {
     #[error("\"{0}\" is not a valid register prefix, must be one of 'v','a','t','s','k'")]
     InvalidPrefix(char),
     #[error("\"{0}\" is not a valid register index, {REG_MUST_BE}")]

@@ -6,7 +6,7 @@ use crate::errors::{LexerError, LexerErrorKind};
 pub mod defs;
 
 #[derive(Debug)]
-pub struct Lexer {
+pub(crate) struct Lexer {
     pos: usize,
     line: usize,
     /// encountered a ", next token is going to be a string
@@ -17,7 +17,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    fn new(input: String) -> Self {
+    pub fn new(input: String) -> Self {
         Lexer {
             pos: 0,
             line: 0,
