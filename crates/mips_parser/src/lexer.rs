@@ -40,13 +40,7 @@ impl Lexer {
                     res.push(tok)
                 }
                 Err(err) => {
-                    let line = self
-                        .input
-                        .iter()
-                        .take(self.pos)
-                        .filter(|&c| *c == 0xA)
-                        .count()
-                        + 1;
+                    let line = res.iter().filter(|&tok| *tok == Token::Newline).count() + 1;
                     return Err(LexerError { kind: err, line });
                 }
             }
@@ -55,10 +49,14 @@ impl Lexer {
 
     fn next_token(&mut self) -> Result<Token, LexerErrorKind> {
         if self.in_string && !self.returned_string {
+            // the last token was a " starting a string
             self.returned_string = true;
             return Ok(Token::String(self.read_string()?));
         }
-        self.skip_whitespace();
+        // skip whitespace and return newline token if needed
+        if let Some(tok) = self.skip_whitespace() {
+            return Ok(tok);
+        }
         let Some(curr) = self.peek() else {
             return Ok(Token::Eof);
         };
@@ -87,10 +85,19 @@ impl Lexer {
     }
 
     /// Increments the position until the next character to be read is not whitespace
-    fn skip_whitespace(&mut self) {
-        while self.peek().is_some_and(|c| c.is_ascii_whitespace()) {
+    /// If it finds a newline returns [`Token::Newline`].
+    /// The next character will be a non whitespace token.
+    fn skip_whitespace(&mut self) -> Option<Token> {
+        while let Some(curr) = self.peek() {
+            if curr == 0xA {
+                self.read_next();
+                return Some(Token::Newline);
+            } else if !curr.is_ascii_whitespace() {
+                return None;
+            }
             self.read_next();
         }
+        None
     }
 
     /// Returns the byte that would be read next without altering the state of the Lexer.
@@ -222,34 +229,42 @@ syscall
         let tokens = [
             Token::Dot,
             Token::Ident("data".into()),
+            Token::Newline,
             Token::Ident("x".into()),
             Token::Colon,
             Token::Dot,
             Token::Ident("word".into()),
             Token::Number(7),
+            Token::Newline,
             Token::Ident("y".into()),
             Token::Colon,
             Token::Dot,
             Token::Ident("word".into()),
             Token::Number(3),
+            Token::Newline,
             Token::Dot,
             Token::Ident("text".into()),
+            Token::Newline,
             Token::Ident("la".into()),
             Token::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('s', 0),
             )),
             Token::Ident("x".into()),
+            Token::Newline,
             Token::Ident("la".into()),
             Token::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('a', 0),
             )),
             Token::Ident("mylabel".into()),
+            Token::Newline,
             Token::Ident("li".into()),
             Token::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('v', 0),
             )),
             Token::Number(4),
+            Token::Newline,
             Token::Ident("syscall".into()),
+            Token::Newline,
             Token::Eof,
         ];
         let mut lexer = Lexer::new(input.into());
@@ -260,8 +275,7 @@ syscall
     }
     #[test]
     fn read_strings() {
-        let input = r#"
-        data "inside string"
+        let input = r#"data "inside string"
         out "inside \" escaped"
         double "inside\"some\"double"
         "#;
@@ -270,14 +284,17 @@ syscall
             Token::DoubleQuote,
             Token::String("inside string".into()),
             Token::DoubleQuote,
+            Token::Newline,
             Token::Ident("out".into()),
             Token::DoubleQuote,
             Token::String("inside \" escaped".into()),
             Token::DoubleQuote,
+            Token::Newline,
             Token::Ident("double".into()),
             Token::DoubleQuote,
             Token::String("inside\"some\"double".into()),
             Token::DoubleQuote,
+            Token::Newline,
         ];
         let mut lexer = Lexer::new(input.into());
         for res in tokens.into_iter() {

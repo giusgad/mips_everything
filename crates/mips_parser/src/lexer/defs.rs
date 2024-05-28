@@ -5,6 +5,7 @@ pub mod register;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Eof,
+    Newline,
 
     // parenthesis
     LParen, // (
