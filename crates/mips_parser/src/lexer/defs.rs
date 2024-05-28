@@ -19,7 +19,6 @@ pub enum Token {
     Comma,       // ,
     Dot,         // .
     Colon,       // :
-    Backslash,   // \\
 
     Register(Register),
     Ident(String),

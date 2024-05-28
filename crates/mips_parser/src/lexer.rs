@@ -77,7 +77,6 @@ impl Lexer {
             b',' => Ok(Token::Comma),
             b':' => Ok(Token::Colon),
             b'.' => Ok(Token::Dot),
-            b'\\' => Ok(Token::Backslash), // TODO: escaping
             b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
@@ -102,6 +101,7 @@ impl Lexer {
             Some(self.input[self.pos])
         }
     }
+
     /// Reads the next byte and increment `self.pos`
     fn read_next(&mut self) -> Option<u8> {
         if self.pos >= self.input.len() {
@@ -164,8 +164,17 @@ impl Lexer {
             self.read_next();
             string.push(c as char);
         }
-        // TODO: parse also bin and hex
-        match string.parse::<i16>() {
+        // parse the number with the correct radix based on the prefix
+        let res = if string.starts_with("0x") {
+            i16::from_str_radix(string.strip_prefix("0x").unwrap(), 16)
+        } else if string.starts_with("0b") {
+            i16::from_str_radix(string.strip_prefix("0b").unwrap(), 2)
+        } else if string.starts_with("0o") {
+            i16::from_str_radix(string.strip_prefix("0o").unwrap(), 8)
+        } else {
+            string.parse::<i16>()
+        };
+        match res {
             Ok(num) => Ok(Token::Number(num)),
             Err(err) => match err.kind() {
                 IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
@@ -306,19 +315,33 @@ test";
     }
     #[test]
     fn parse_numbers() {
-        let mut lexer = Lexer::new("3 12 4".into());
+        let mut lexer = Lexer::new("3 12 0x1f 0b1101 0o12".into());
         let tokens = vec![
             Token::Number(3),
             Token::Number(12),
-            Token::Number(4),
+            Token::Number(31),
+            Token::Number(13),
+            Token::Number(10),
             Token::Eof,
         ];
         assert_eq!(lexer.lex().unwrap(), tokens);
 
-        let strs = ["3a", "32768"];
+        let strs = ["3a", "32768", "0x1h"];
+        let mut errs = [
+            LexerErrorKind::NumberParseError("3a".into()),
+            LexerErrorKind::NumberOutOfRange("32768".into()),
+            LexerErrorKind::NumberParseError("0x1h".into()),
+        ]
+        .into_iter();
         for s in strs {
             let mut lexer = Lexer::new(s.into());
-            assert!(lexer.lex().is_err());
+            assert_eq!(
+                lexer.lex(),
+                Err(LexerError {
+                    kind: errs.next().unwrap(),
+                    line: 1
+                })
+            );
         }
     }
 }
