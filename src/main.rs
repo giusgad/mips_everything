@@ -11,17 +11,14 @@ struct Args {
 
 #[derive(thiserror::Error)]
 enum MipsError {
-    #[error("Io error: {0}")]
+    #[error("Cli error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Compilation error: {0}")]
+    #[error("{0}")]
     Compile(#[from] CompileError),
 }
 impl std::fmt::Debug for MipsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Io(arg) => write!(f, "{arg}"),
-            Self::Compile(arg) => write!(f, "{arg}"),
-        }
+        write!(f, "{self}")
     }
 }
 
@@ -42,7 +39,17 @@ fn main() -> Result<(), MipsError> {
             )
             .into());
         }
-        MipsCompiler::new(std::fs::read_to_string(path)?).compile()?
+        let file_content = std::fs::read_to_string(path.clone())?;
+        let res = MipsCompiler::new(file_content.clone()).compile();
+        match res {
+            Ok(_) => {}
+            Err(err) => {
+                // the error is displayed with ariadne
+                let file_name = path.file_name().unwrap().to_string_lossy();
+                //TODO: filename
+                err.display_formatted("test.asm", &file_content)?;
+            }
+        };
     }
     Ok(())
 }

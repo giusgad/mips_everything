@@ -8,5 +8,5 @@ members = ["crates/*"]
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
-mips_parser = { path="./crates/mips_parser/" }
+mips_parser = { path = "./crates/mips_parser/" }
 thiserror = "1.0.61"

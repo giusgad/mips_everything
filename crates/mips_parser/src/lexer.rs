@@ -8,6 +8,8 @@ pub mod defs;
 #[derive(Debug)]
 pub(crate) struct Lexer {
     pos: usize,
+    /// The starting position of the last token
+    last_pos: usize,
     line: usize,
     /// encountered a ", next token is going to be a string
     in_string: bool,
@@ -20,6 +22,7 @@ impl Lexer {
     pub fn new(input: String) -> Self {
         Lexer {
             pos: 0,
+            last_pos: 0,
             line: 0,
             input: input.into_bytes(),
             in_string: false,
@@ -40,14 +43,22 @@ impl Lexer {
                     res.push(tok)
                 }
                 Err(err) => {
-                    let line = res.iter().filter(|&tok| *tok == Token::Newline).count() + 1;
-                    return Err(LexerError { kind: err, line });
+                    let mut from = self.last_pos;
+                    while self.input[from].is_ascii_whitespace() {
+                        from += 1;
+                    }
+                    let target_range = from..self.pos;
+                    return Err(LexerError {
+                        kind: err,
+                        target_range,
+                    });
                 }
             }
         }
     }
 
     fn next_token(&mut self) -> Result<Token, LexerErrorKind> {
+        self.last_pos = self.pos;
         if self.in_string && !self.returned_string {
             // the last token was a " starting a string
             self.returned_string = true;
@@ -326,7 +337,7 @@ test";
             lexer.lex(),
             Err(LexerError {
                 kind: LexerErrorKind::Register(RegisterParseError::Other("error".into())),
-                line: 3
+                target_range: 0..1
             })
         )
     }
@@ -356,7 +367,7 @@ test";
                 lexer.lex(),
                 Err(LexerError {
                     kind: errs.next().unwrap(),
-                    line: 1
+                    target_range: 0..1
                 })
             );
         }
