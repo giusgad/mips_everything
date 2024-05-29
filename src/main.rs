@@ -1,6 +1,6 @@
 use clap::Parser;
 use mips_parser::{errors::CompileError, MipsCompiler};
-use std::path::PathBuf;
+use std::{borrow::Borrow, path::PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -45,9 +45,9 @@ fn main() -> Result<(), MipsError> {
             Ok(_) => {}
             Err(err) => {
                 // the error is displayed with ariadne
-                let file_name = path.file_name().unwrap().to_string_lossy();
-                //TODO: filename
-                err.display_formatted("test.asm", &file_content)?;
+                let a = path.file_name().unwrap().to_string_lossy();
+                let file_name: &str = a.borrow();
+                err.display_formatted(file_name.to_owned(), &file_content)?;
             }
         };
     }

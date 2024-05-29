@@ -2,19 +2,44 @@ use std::str::FromStr;
 use strum::EnumString;
 use thiserror::Error;
 
+use crate::errors::AriadneError;
+
 const REG_MUST_BE: &str =
-    "must be $0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0-$v1 or $ra,$at,$gp,$sp,$fp.";
+    "$0-$31 or $a0-$a3,$t0-$t9,$s0-$s7,$k0-$k1,$v0-$v1 or $ra,$at,$gp,$sp,$fp";
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum RegisterParseError {
-    #[error("\"{0}\" is not a valid register prefix, must be one of 'v','a','t','s','k'")]
+    #[error("\"{0}\" is not a valid register prefix")]
     InvalidPrefix(char),
-    #[error("\"{0}\" is not a valid register index, {REG_MUST_BE}")]
+    #[error("\"{0}\" is not a valid register index")]
     InvalidIndex(String),
-    #[error("Register number is out of range, {REG_MUST_BE}")]
+    #[error("Register number is out of range")]
     OutOfRange(u8),
-    #[error("Couldn't parse register: \"{0}\", {REG_MUST_BE}")]
-    Other(String),
+    #[error("Couldn't parse register")]
+    Other,
+}
+
+impl AriadneError for RegisterParseError {
+    fn general_message(&self) -> String {
+        format!("{self}")
+    }
+    fn label(&self) -> String {
+        match self {
+            RegisterParseError::InvalidPrefix(_) => "Prefix for this register is invalid",
+            RegisterParseError::InvalidIndex(_) => "Index for this register is invalid",
+            RegisterParseError::OutOfRange(_) => "Index for this register is out of range",
+            RegisterParseError::Other => "This register is invalid",
+        }
+        .to_owned()
+    }
+    fn note(&self) -> Option<String> {
+        match self {
+            RegisterParseError::InvalidPrefix(_) => {
+                Some(format!("Prefix must be one of 'v','a','t','s','k' so that the register name is one of {REG_MUST_BE}."))
+            }
+            _ => Some(format!("Register must be one of {REG_MUST_BE}.")),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -51,7 +76,7 @@ impl TryFrom<&[char]> for Register {
                 Err(err) => Err(err),
             };
         }
-        Err(RegisterParseError::Other(reg_string))
+        Err(RegisterParseError::Other)
     }
 }
 
@@ -74,7 +99,7 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
     fn try_from(chars: &[char]) -> Result<Self, Self::Error> {
         // there must be exactly 2 chars: ['s','7']
         if chars.len() != 2 {
-            return Err(RegisterParseError::Other(String::from_iter(chars)));
+            return Err(RegisterParseError::Other);
         }
 
         let mut res = RegisterPrefixedName {
@@ -103,7 +128,7 @@ impl TryFrom<&[char]> for RegisterPrefixedName {
             }
             res.index = index as u8;
         } else {
-            return Err(RegisterParseError::Other(String::from_iter(chars)));
+            return Err(RegisterParseError::Other);
         }
         Ok(res)
     }

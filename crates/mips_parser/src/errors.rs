@@ -4,6 +4,19 @@ use crate::lexer::defs::register::RegisterParseError;
 use ariadne::{sources, Config, IndexType, Label, Report, ReportKind};
 use thiserror::Error;
 
+/// This trait implements functions that define how an error is displayed with [`ariadne`].
+pub trait AriadneError {
+    /// The general message that goes before the code snippet.
+    /// Acts like the "title" of the error.
+    fn general_message(&self) -> String;
+    /// The text that goes on the label connected to the code snippet
+    fn label(&self) -> String;
+    /// A note to add after the code snippet
+    fn note(&self) -> Option<String> {
+        None
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum CompileError {
     #[error("Syntax error {0}")]
@@ -13,37 +26,47 @@ pub enum CompileError {
 }
 
 impl CompileError {
-    pub fn display_formatted(
-        &self,
-        file_name: &'static str,
-        file_content: &str,
-    ) -> std::io::Result<()> {
-        Report::build(ReportKind::Error, file_name, 0)
-            .with_config(Config::default().with_index_type(IndexType::Byte))
-            .with_message(self.variant_str())
-            .with_label(
-                Label::new((file_name, self.get_target_range())).with_message(self.get_message()),
-            )
+    pub fn display_formatted(&self, file_name: String, file_content: &str) -> std::io::Result<()> {
+        let mut report = Report::build(
+            ReportKind::Error,
+            file_name.clone(),
+            self.get_span().next().unwrap(),
+        )
+        .with_config(Config::default().with_index_type(IndexType::Byte))
+        .with_message(self.general_message());
+        report.add_label(
+            Label::new((file_name.clone(), self.get_span())).with_message(self.label_message()),
+        );
+        if let Some(note) = self.get_note() {
+            report.set_note(note);
+        }
+        report
             .finish()
             .eprint(sources(vec![(file_name, file_content)]))?;
         Ok(())
     }
 
-    fn get_target_range(&self) -> Range<usize> {
+    fn get_note(&self) -> Option<String> {
         match self {
-            CompileError::Lexer(err) => err.target_range.clone(),
+            CompileError::Lexer(err) => err.kind.note(),
         }
     }
 
-    fn variant_str(&self) -> &str {
+    fn general_message(&self) -> String {
         match self {
-            CompileError::Lexer(_) => "Syntax error",
+            CompileError::Lexer(err) => err.kind.general_message(),
         }
     }
 
-    fn get_message(&self) -> String {
+    fn get_span(&self) -> Range<usize> {
         match self {
-            CompileError::Lexer(err) => err.kind.to_string(),
+            CompileError::Lexer(err) => err.span.clone(),
+        }
+    }
+
+    fn label_message(&self) -> String {
+        match self {
+            CompileError::Lexer(err) => err.kind.label(),
         }
     }
 }
@@ -52,20 +75,45 @@ impl CompileError {
 #[error("{kind}")]
 pub struct LexerError {
     pub kind: LexerErrorKind,
-    // The range of the bytes that caused the error
-    pub target_range: Range<usize>,
+    // The span of bytes that caused the error
+    pub span: Range<usize>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum LexerErrorKind {
-    #[error("Invalid register: \"{0}\"")]
+    #[error("Invalid register: {0}")]
     Register(#[from] RegisterParseError),
-    #[error("Invalid token, couldn't read: \"{0}\"")]
+    #[error("Invalid token: \"{0}\"")]
     InvalidToken(char),
-    #[error("Expected string closing delimiter")]
+    #[error("Expected string closing delimiter.")]
     ExpectedStringEnd,
-    #[error("Number literal \"{0}\" is invalid.")]
-    NumberParseError(String),
-    #[error("Number out of range \"{0}\", must be between -32768 and 32767")]
-    NumberOutOfRange(String),
+    #[error("Number literal is invalid.")]
+    NumberParseError,
+    #[error("Number out of range.")]
+    NumberOutOfRange,
+}
+
+impl AriadneError for LexerErrorKind {
+    fn general_message(&self) -> String {
+        format!("{self}")
+    }
+    fn label(&self) -> String {
+        match self {
+            LexerErrorKind::Register(err) => err.label(),
+            LexerErrorKind::InvalidToken(_) => "This token is invalid".into(),
+            LexerErrorKind::ExpectedStringEnd => "The string should be closed".into(),
+            LexerErrorKind::NumberParseError => "This number/address is not valid".into(),
+            LexerErrorKind::NumberOutOfRange => "This number is out of range".into(),
+        }
+    }
+    fn note(&self) -> Option<String> {
+        match self {
+            LexerErrorKind::Register(err) => err.note(),
+            LexerErrorKind::ExpectedStringEnd => {
+                Some("The quote that should close the string is missing.".into())
+            }
+            LexerErrorKind::NumberOutOfRange => Some("The number is represented with 16 bits, therefore it must be between -32768 and 32767".into()),
+            _ => None,
+        }
+    }
 }

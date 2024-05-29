@@ -50,7 +50,7 @@ impl Lexer {
                     let target_range = from..self.pos;
                     return Err(LexerError {
                         kind: err,
-                        target_range,
+                        span: target_range,
                     });
                 }
             }
@@ -89,7 +89,7 @@ impl Lexer {
             b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
-            c => Err(LexerErrorKind::InvalidToken(c.into())),
+            c => Err(LexerErrorKind::InvalidToken(c as char)),
         };
         self.read_next();
         res
@@ -196,9 +196,9 @@ impl Lexer {
             Ok(num) => Ok(Token::Number(num)),
             Err(err) => match err.kind() {
                 IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
-                    Err(LexerErrorKind::NumberOutOfRange(string))
+                    Err(LexerErrorKind::NumberOutOfRange)
                 }
-                _ => Err(LexerErrorKind::NumberParseError(string)),
+                _ => Err(LexerErrorKind::NumberParseError),
             },
         }
     }
@@ -336,8 +336,8 @@ test";
         assert_eq!(
             lexer.lex(),
             Err(LexerError {
-                kind: LexerErrorKind::Register(RegisterParseError::Other("error".into())),
-                target_range: 0..1
+                kind: LexerErrorKind::Register(RegisterParseError::Other),
+                span: 0..1
             })
         )
     }
@@ -356,9 +356,9 @@ test";
 
         let strs = ["3a", "32768", "0x1h"];
         let mut errs = [
-            LexerErrorKind::NumberParseError("3a".into()),
-            LexerErrorKind::NumberOutOfRange("32768".into()),
-            LexerErrorKind::NumberParseError("0x1h".into()),
+            LexerErrorKind::NumberParseError,
+            LexerErrorKind::NumberOutOfRange,
+            LexerErrorKind::NumberParseError,
         ]
         .into_iter();
         for s in strs {
@@ -367,7 +367,7 @@ test";
                 lexer.lex(),
                 Err(LexerError {
                     kind: errs.next().unwrap(),
-                    target_range: 0..1
+                    span: 0..1
                 })
             );
         }
