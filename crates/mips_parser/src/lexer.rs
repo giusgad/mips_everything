@@ -337,7 +337,7 @@ test";
             lexer.lex(),
             Err(LexerError {
                 kind: LexerErrorKind::Register(RegisterParseError::Other),
-                span: 0..1
+                span: 13..19
             })
         )
     }
@@ -367,7 +367,7 @@ test";
                 lexer.lex(),
                 Err(LexerError {
                     kind: errs.next().unwrap(),
-                    span: 0..1
+                    span: 0..s.len()
                 })
             );
         }

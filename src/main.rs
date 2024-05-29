@@ -1,5 +1,5 @@
 use clap::Parser;
-use mips_parser::{errors::CompileError, MipsCompiler};
+use mips_parser::MipsCompiler;
 use std::{borrow::Borrow, path::PathBuf};
 
 #[derive(Parser, Debug)]
@@ -11,10 +11,8 @@ struct Args {
 
 #[derive(thiserror::Error)]
 enum MipsError {
-    #[error("Cli error: {0}")]
-    Io(#[from] std::io::Error),
     #[error("{0}")]
-    Compile(#[from] CompileError),
+    Io(#[from] std::io::Error),
 }
 impl std::fmt::Debug for MipsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
