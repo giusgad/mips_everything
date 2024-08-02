@@ -1,6 +1,6 @@
 use crate::lexer::defs::Token;
 
-pub struct Parser {
+pub(crate) struct Parser {
     tokens: Vec<Token>,
 }
 

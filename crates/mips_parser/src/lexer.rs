@@ -1,14 +1,16 @@
 use std::num::IntErrorKind;
 
+use defs::TokenKind;
+
 use self::defs::{register::Register, Token};
 use crate::errors::{LexerError, LexerErrorKind};
 
-pub mod defs;
+pub(crate) mod defs;
 
 #[derive(Debug)]
 pub(crate) struct Lexer<'a> {
     pos: usize,
-    input: &'a[u8],
+    input: &'a [u8],
 }
 
 impl<'a> Lexer<'a> {
@@ -23,58 +25,46 @@ impl<'a> Lexer<'a> {
     pub fn lex(&mut self) -> Result<Vec<Token>, LexerError> {
         let mut res = Vec::new();
         loop {
-            match self.next_token() {
-                Ok(tok) => {
-                    if tok == Token::Eof {
-                        res.push(tok);
-                        return Ok(res);
-                    }
-                    res.push(tok)
-                }
-                Err(err) => {
-                    /* let mut from = self.last_pos;
-                    while self.input[from].is_ascii_whitespace() {
-                        from += 1;
-                    }
-                    let target_range = from..self.pos; */
-                    let target_range = 0..1; //TODO: span
-                    return Err(LexerError {
-                        kind: err,
-                        span: target_range,
-                    });
-                }
+            let tok = self.next_token()?;
+            if tok.kind == TokenKind::Eof {
+                res.push(tok);
+                return Ok(res);
             }
+            res.push(tok)
         }
     }
 
-    fn next_token(&mut self) -> Result<Token, LexerErrorKind> {
+    fn next_token(&mut self) -> Result<Token, LexerError> {
         // skip whitespace and return newline token if needed
         if let Some(tok) = self.skip_whitespace() {
             return Ok(tok);
         }
         let Some(curr) = self.peek() else {
-            return Ok(Token::Eof);
+            return Ok(Token::new(TokenKind::Eof, 0..1));
         };
-        let res = match curr {
-            b'(' => Ok(Token::LParen),
-            b')' => Ok(Token::RParen),
-            b'"' => {
-                Ok(Token::String(self.read_string()?))
-            }
-            b'\'' => Ok(Token::SingleQuote),
-            b'#' => Ok(Token::Sharp),
-            b'+' => Ok(Token::Plus),
-            b'-' => Ok(Token::Minus),
-            b',' => Ok(Token::Comma),
-            b':' => Ok(Token::Colon),
-            b'.' => Ok(Token::Dot),
+        let kind = match curr {
+            b'(' => TokenKind::LParen,
+            b')' => TokenKind::RParen,
+            b'"' => return self.read_string(),
+            b'\'' => TokenKind::SingleQuote,
+            b'#' => TokenKind::Sharp,
+            b'+' => TokenKind::Plus,
+            b'-' => TokenKind::Minus,
+            b',' => TokenKind::Comma,
+            b':' => TokenKind::Colon,
+            b'.' => TokenKind::Dot,
             b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
-            c => Err(LexerErrorKind::InvalidToken(c as char)),
+            c => {
+                return Err(LexerError::new(
+                    LexerErrorKind::InvalidToken(*c as char),
+                    self.pos..self.pos,
+                ))
+            }
         };
         self.read_next();
-        res
+        Ok(Token { kind, span: 0..1 })
     }
 
     /// Increments the position until the next character to be read is not whitespace
@@ -82,9 +72,9 @@ impl<'a> Lexer<'a> {
     /// The next character will be a non whitespace token.
     fn skip_whitespace(&mut self) -> Option<Token> {
         while let Some(curr) = self.peek() {
-            if curr == 0xA {
+            if *curr == 0xA {
                 self.read_next();
-                return Some(Token::Newline);
+                return Some(Token::new(TokenKind::Newline, self.pos - 1..self.pos));
             } else if !curr.is_ascii_whitespace() {
                 return None;
             }
@@ -94,11 +84,11 @@ impl<'a> Lexer<'a> {
     }
 
     /// Returns the byte that would be read next without altering the state of the Lexer.
-    fn peek(&self) -> Option<u8> {
+    fn peek(&self) -> Option<&u8> {
         if self.pos >= self.input.len() {
             None
         } else {
-            Some(self.input[self.pos])
+            Some(&self.input[self.pos])
         }
     }
 
@@ -114,57 +104,65 @@ impl<'a> Lexer<'a> {
 
     /// Reads a string, stops when a non escaped closing quote is found, returns an error if the
     /// closing delimiter doesn't exist
-    fn read_string(&mut self) -> Result<String, LexerErrorKind> {
+    fn read_string(&mut self) -> Result<Token, LexerError> {
+        let start = self.pos;
         let mut string = String::new();
         let mut escaped = false;
+        // skip the " that starts the string
+        assert!(self.read_next().is_some_and(|c| c == b'"'));
         while let Some(c) = self.peek() {
             if escaped {
                 escaped = false;
                 //TODO: special chars like \n
-                string.push(c as char);
+                string.push(*c as char);
                 self.read_next();
                 continue;
-            } else if c == b'"' {
+            } else if *c == b'"' {
                 break;
-            } else if c == b'\\' {
+            } else if *c == b'\\' {
                 escaped = true;
                 self.read_next();
                 continue;
             }
+            string.push(*c as char);
             self.read_next();
-            string.push(c as char)
         }
-        // Self.peek() should be '"' because the next token will be a closing quote,
+        // Next char should be '"' because the next token will be a closing quote,
         // if it's not the string is not closed and it's an error
-        if self.peek() != Some(b'"') {
-            return Err(LexerErrorKind::ExpectedStringEnd);
+        if self.read_next() != Some(b'"') {
+            return Err(LexerError::new(
+                LexerErrorKind::ExpectedStringEnd,
+                start..self.pos,
+            ));
         }
-        Ok(string)
+        Ok(Token::new(TokenKind::String(string), start..self.pos))
     }
 
     /// Reads an ident, keeps going until an ascii whitespace character is found
-    fn read_ident(&mut self) -> Result<Token, LexerErrorKind> {
+    fn read_ident(&mut self) -> Result<Token, LexerError> {
         let mut string = String::new();
+        let start = self.pos;
         while let Some(c) = self.peek() {
             if !c.is_ascii_alphanumeric() {
                 break;
             }
+            string.push(*c as char);
             self.read_next();
-            string.push(c as char);
         }
-        Ok(Token::Ident(string))
+        Ok(Token::new(TokenKind::Ident(string), start..self.pos))
     }
 
-    fn read_number(&mut self) -> Result<Token, LexerErrorKind> {
+    fn read_number(&mut self) -> Result<Token, LexerError> {
+        let start = self.pos;
         let mut string = String::new();
         while let Some(c) = self.peek() {
             if !c.is_ascii_alphanumeric() {
                 break;
             }
+            string.push(*c as char);
             self.read_next();
-            string.push(c as char);
         }
-        // parse the number with the correct radix based on the prefix
+        // parse the number with the correct radia based on the prefix
         let res = if string.starts_with("0x") {
             i16::from_str_radix(string.strip_prefix("0x").unwrap(), 16)
         } else if string.starts_with("0b") {
@@ -174,20 +172,22 @@ impl<'a> Lexer<'a> {
         } else {
             string.parse::<i16>()
         };
+        let span = start..self.pos;
         match res {
-            Ok(num) => Ok(Token::Number(num)),
+            Ok(num) => Ok(Token::new(TokenKind::Number(num), span)),
             Err(err) => match err.kind() {
                 IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
-                    Err(LexerErrorKind::NumberOutOfRange)
+                    Err(LexerError::new(LexerErrorKind::NumberOutOfRange, span))
                 }
-                _ => Err(LexerErrorKind::NumberParseError),
+                _ => Err(LexerError::new(LexerErrorKind::NumberParseError, span)),
             },
         }
     }
 
     /// Reads a register starting from a dollar sign, returning a [`Token::Register`], containing the representation of the
     /// register following the $
-    fn read_register(&mut self) -> Result<Token, LexerErrorKind> {
+    fn read_register(&mut self) -> Result<Token, LexerError> {
+        let start = self.pos;
         let mut chars = Vec::new();
         // skip the $ itself
         self.read_next();
@@ -195,10 +195,20 @@ impl<'a> Lexer<'a> {
             if !c.is_ascii_alphanumeric() {
                 break;
             }
+            chars.push(*c as char);
             self.read_next();
-            chars.push(c as char);
         }
-        Ok(Token::Register(Register::try_from(chars.as_slice())?))
+        let span = start..self.pos;
+        let register = match Register::try_from(chars.as_slice()) {
+            Ok(reg) => reg,
+            Err(err) => {
+                return Err(LexerError {
+                    kind: err.into(),
+                    span,
+                })
+            }
+        };
+        Ok(Token::new(TokenKind::Register(register), span))
     }
 }
 
@@ -220,51 +230,51 @@ li $v0 4
 syscall			
 ";
         let tokens = [
-            Token::Dot,
-            Token::Ident("data".into()),
-            Token::Newline,
-            Token::Ident("x".into()),
-            Token::Colon,
-            Token::Dot,
-            Token::Ident("word".into()),
-            Token::Number(7),
-            Token::Newline,
-            Token::Ident("y".into()),
-            Token::Colon,
-            Token::Dot,
-            Token::Ident("word".into()),
-            Token::Number(3),
-            Token::Newline,
-            Token::Dot,
-            Token::Ident("text".into()),
-            Token::Newline,
-            Token::Ident("la".into()),
-            Token::Register(Register::PrefixedNumber(
+            TokenKind::Dot,
+            TokenKind::Ident("data".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("x".into()),
+            TokenKind::Colon,
+            TokenKind::Dot,
+            TokenKind::Ident("word".into()),
+            TokenKind::Number(7),
+            TokenKind::Newline,
+            TokenKind::Ident("y".into()),
+            TokenKind::Colon,
+            TokenKind::Dot,
+            TokenKind::Ident("word".into()),
+            TokenKind::Number(3),
+            TokenKind::Newline,
+            TokenKind::Dot,
+            TokenKind::Ident("text".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("la".into()),
+            TokenKind::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('s', 0),
             )),
-            Token::Ident("x".into()),
-            Token::Newline,
-            Token::Ident("la".into()),
-            Token::Register(Register::PrefixedNumber(
+            TokenKind::Ident("x".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("la".into()),
+            TokenKind::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('a', 0),
             )),
-            Token::Ident("mylabel".into()),
-            Token::Newline,
-            Token::Ident("li".into()),
-            Token::Register(Register::PrefixedNumber(
+            TokenKind::Ident("mylabel".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("li".into()),
+            TokenKind::Register(Register::PrefixedNumber(
                 RegisterPrefixedName::new_unchecked('v', 0),
             )),
-            Token::Number(4),
-            Token::Newline,
-            Token::Ident("syscall".into()),
-            Token::Newline,
-            Token::Eof,
+            TokenKind::Number(4),
+            TokenKind::Newline,
+            TokenKind::Ident("syscall".into()),
+            TokenKind::Newline,
+            TokenKind::Eof,
         ];
         let mut lexer = Lexer::new(input);
         for res in tokens.into_iter() {
-            assert_eq!(lexer.next_token().unwrap(), res);
+            assert_eq!(lexer.next_token().unwrap().kind, res);
         }
-        assert_eq!(lexer.next_token().unwrap(), Token::Eof);
+        assert_eq!(lexer.next_token().unwrap().kind, TokenKind::Eof);
     }
     #[test]
     fn read_strings() {
@@ -273,43 +283,44 @@ syscall
         double "inside\"some\"double"
         "#;
         let tokens = [
-            Token::Ident("data".into()),
-            Token::DoubleQuote,
-            Token::String("inside string".into()),
-            Token::DoubleQuote,
-            Token::Newline,
-            Token::Ident("out".into()),
-            Token::DoubleQuote,
-            Token::String("inside \" escaped".into()),
-            Token::DoubleQuote,
-            Token::Newline,
-            Token::Ident("double".into()),
-            Token::DoubleQuote,
-            Token::String("inside\"some\"double".into()),
-            Token::DoubleQuote,
-            Token::Newline,
+            TokenKind::Ident("data".into()),
+            TokenKind::String("inside string".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("out".into()),
+            TokenKind::String("inside \" escaped".into()),
+            TokenKind::Newline,
+            TokenKind::Ident("double".into()),
+            TokenKind::String("inside\"some\"double".into()),
+            TokenKind::Newline,
         ];
         let mut lexer = Lexer::new(input);
         for res in tokens.into_iter() {
-            assert_eq!(lexer.next_token().unwrap(), res);
+            assert_eq!(lexer.next_token().unwrap().kind, res);
         }
-        assert_eq!(lexer.next_token().unwrap(), Token::Eof);
+        assert_eq!(lexer.next_token().unwrap().kind, TokenKind::Eof);
         let mut lexer = Lexer::new("\"Open string");
-        assert_eq!(lexer.next_token(), Ok(Token::DoubleQuote));
-        assert_eq!(lexer.next_token(), Err(LexerErrorKind::ExpectedStringEnd));
-        assert_eq!(lexer.next_token(), Ok(Token::Eof));
+        assert_eq!(lexer.next_token(), Err(LexerError::new(LexerErrorKind::ExpectedStringEnd, 0..12)));
     }
     #[test]
     fn lex() {
         let input = "lw $ra 4";
         let mut lexer = Lexer::new(input);
         let tokens = vec![
-            Token::Ident("lw".into()),
-            Token::Register(Register::Name(RegisterName::Ra)),
-            Token::Number(4),
-            Token::Eof,
+            TokenKind::Ident("lw".into()),
+            TokenKind::Register(Register::Name(RegisterName::Ra)),
+            TokenKind::Number(4),
+            TokenKind::Eof,
         ];
-        assert_eq!(lexer.lex(), Ok(tokens));
+        //TODO: test spans
+        assert_eq!(
+            lexer
+                .lex()
+                .unwrap()
+                .into_iter()
+                .map(|t| t.kind)
+                .collect::<Vec<_>>(),
+            tokens
+        );
         let input = "lw 4
 iden
 lw $error
@@ -327,14 +338,22 @@ test";
     fn parse_numbers() {
         let mut lexer = Lexer::new("3 12 0x1f 0b1101 0o12");
         let tokens = vec![
-            Token::Number(3),
-            Token::Number(12),
-            Token::Number(31),
-            Token::Number(13),
-            Token::Number(10),
-            Token::Eof,
+            TokenKind::Number(3),
+            TokenKind::Number(12),
+            TokenKind::Number(31),
+            TokenKind::Number(13),
+            TokenKind::Number(10),
+            TokenKind::Eof,
         ];
-        assert_eq!(lexer.lex().unwrap(), tokens);
+        assert_eq!(
+            lexer
+                .lex()
+                .unwrap()
+                .into_iter()
+                .map(|t| t.kind)
+                .collect::<Vec<_>>(),
+            tokens
+        );
 
         let strs = ["3a", "32768", "0x1h"];
         let mut errs = [

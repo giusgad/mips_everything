@@ -5,7 +5,7 @@ use ariadne::{sources, Config, IndexType, Label, Report, ReportKind};
 use thiserror::Error;
 
 /// This trait implements functions that define how an error is displayed with [`ariadne`].
-pub trait AriadneError {
+pub(crate) trait AriadneError {
     /// The general message that goes before the code snippet.
     /// Acts like the "title" of the error.
     fn general_message(&self) -> String;
@@ -77,6 +77,12 @@ pub struct LexerError {
     pub kind: LexerErrorKind,
     // The span of bytes that caused the error
     pub span: Range<usize>,
+}
+
+impl LexerError {
+    pub fn new(kind: LexerErrorKind, span: Range<usize>) -> Self {
+        Self { kind, span }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

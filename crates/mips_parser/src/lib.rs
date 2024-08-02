@@ -3,8 +3,8 @@
 use errors::CompileError;
 use lexer::Lexer;
 
-pub mod errors;
-pub mod lexer;
+mod errors;
+mod lexer;
 mod parser;
 
 pub struct MipsCompiler<'a> {
