@@ -6,27 +6,16 @@ use crate::errors::{LexerError, LexerErrorKind};
 pub mod defs;
 
 #[derive(Debug)]
-pub(crate) struct Lexer {
+pub(crate) struct Lexer<'a> {
     pos: usize,
-    /// The starting position of the last token
-    last_pos: usize,
-    line: usize,
-    /// encountered a ", next token is going to be a string
-    in_string: bool,
-    /// last token was a string
-    returned_string: bool,
-    input: Vec<u8>,
+    input: &'a[u8],
 }
 
-impl Lexer {
-    pub fn new(input: String) -> Self {
+impl<'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Self {
         Lexer {
             pos: 0,
-            last_pos: 0,
-            line: 0,
-            input: input.into_bytes(),
-            in_string: false,
-            returned_string: false,
+            input: input.as_bytes(),
         }
     }
 
@@ -43,11 +32,12 @@ impl Lexer {
                     res.push(tok)
                 }
                 Err(err) => {
-                    let mut from = self.last_pos;
+                    /* let mut from = self.last_pos;
                     while self.input[from].is_ascii_whitespace() {
                         from += 1;
                     }
-                    let target_range = from..self.pos;
+                    let target_range = from..self.pos; */
+                    let target_range = 0..1; //TODO: span
                     return Err(LexerError {
                         kind: err,
                         span: target_range,
@@ -58,12 +48,6 @@ impl Lexer {
     }
 
     fn next_token(&mut self) -> Result<Token, LexerErrorKind> {
-        self.last_pos = self.pos;
-        if self.in_string && !self.returned_string {
-            // the last token was a " starting a string
-            self.returned_string = true;
-            return Ok(Token::String(self.read_string()?));
-        }
         // skip whitespace and return newline token if needed
         if let Some(tok) = self.skip_whitespace() {
             return Ok(tok);
@@ -75,9 +59,7 @@ impl Lexer {
             b'(' => Ok(Token::LParen),
             b')' => Ok(Token::RParen),
             b'"' => {
-                self.returned_string = false;
-                self.in_string = !self.in_string;
-                Ok(Token::DoubleQuote)
+                Ok(Token::String(self.read_string()?))
             }
             b'\'' => Ok(Token::SingleQuote),
             b'#' => Ok(Token::Sharp),
@@ -278,7 +260,7 @@ syscall
             Token::Newline,
             Token::Eof,
         ];
-        let mut lexer = Lexer::new(input.into());
+        let mut lexer = Lexer::new(input);
         for res in tokens.into_iter() {
             assert_eq!(lexer.next_token().unwrap(), res);
         }
@@ -307,12 +289,12 @@ syscall
             Token::DoubleQuote,
             Token::Newline,
         ];
-        let mut lexer = Lexer::new(input.into());
+        let mut lexer = Lexer::new(input);
         for res in tokens.into_iter() {
             assert_eq!(lexer.next_token().unwrap(), res);
         }
         assert_eq!(lexer.next_token().unwrap(), Token::Eof);
-        let mut lexer = Lexer::new("\"Open string".into());
+        let mut lexer = Lexer::new("\"Open string");
         assert_eq!(lexer.next_token(), Ok(Token::DoubleQuote));
         assert_eq!(lexer.next_token(), Err(LexerErrorKind::ExpectedStringEnd));
         assert_eq!(lexer.next_token(), Ok(Token::Eof));
@@ -320,7 +302,7 @@ syscall
     #[test]
     fn lex() {
         let input = "lw $ra 4";
-        let mut lexer = Lexer::new(input.into());
+        let mut lexer = Lexer::new(input);
         let tokens = vec![
             Token::Ident("lw".into()),
             Token::Register(Register::Name(RegisterName::Ra)),
@@ -332,7 +314,7 @@ syscall
 iden
 lw $error
 test";
-        let mut lexer = Lexer::new(input.into());
+        let mut lexer = Lexer::new(input);
         assert_eq!(
             lexer.lex(),
             Err(LexerError {
@@ -343,7 +325,7 @@ test";
     }
     #[test]
     fn parse_numbers() {
-        let mut lexer = Lexer::new("3 12 0x1f 0b1101 0o12".into());
+        let mut lexer = Lexer::new("3 12 0x1f 0b1101 0o12");
         let tokens = vec![
             Token::Number(3),
             Token::Number(12),
@@ -362,7 +344,7 @@ test";
         ]
         .into_iter();
         for s in strs {
-            let mut lexer = Lexer::new(s.into());
+            let mut lexer = Lexer::new(s);
             assert_eq!(
                 lexer.lex(),
                 Err(LexerError {

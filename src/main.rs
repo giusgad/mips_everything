@@ -38,7 +38,7 @@ fn main() -> Result<(), MipsError> {
             .into());
         }
         let file_content = std::fs::read_to_string(path.clone())?;
-        let res = MipsCompiler::new(file_content.clone()).compile();
+        let res = MipsCompiler::new(&file_content).compile();
         match res {
             Ok(_) => {}
             Err(err) => {

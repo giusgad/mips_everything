@@ -7,18 +7,18 @@ pub mod errors;
 pub mod lexer;
 mod parser;
 
-pub struct MipsCompiler {
-    input: String,
+pub struct MipsCompiler<'a> {
+    input: &'a str,
 }
 
-type Ast = ();
-impl MipsCompiler {
-    pub fn new(input: String) -> Self {
+impl<'a> MipsCompiler<'a> {
+    pub fn new(input: &'a str) -> Self {
         Self { input }
     }
-    pub fn compile(self) -> Result<Ast, CompileError> {
+    pub fn compile(self) -> Result<(), CompileError> {
         //TODO: bring every part together
         let _tokens = Lexer::new(self.input).lex()?;
+        dbg!(_tokens);
         Ok(())
     }
 }
