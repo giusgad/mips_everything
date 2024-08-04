@@ -299,7 +299,10 @@ syscall
         }
         assert_eq!(lexer.next_token().unwrap().kind, TokenKind::Eof);
         let mut lexer = Lexer::new("\"Open string");
-        assert_eq!(lexer.next_token(), Err(LexerError::new(LexerErrorKind::ExpectedStringEnd, 0..12)));
+        assert_eq!(
+            lexer.next_token(),
+            Err(LexerError::new(LexerErrorKind::ExpectedStringEnd, 0..12))
+        );
     }
     #[test]
     fn lex() {

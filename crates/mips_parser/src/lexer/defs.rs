@@ -3,6 +3,7 @@ use std::ops::Range;
 use self::register::Register;
 
 pub(crate) mod register;
+pub(crate) mod instruction;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Token {
