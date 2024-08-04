@@ -16,16 +16,7 @@ pub(crate) enum InstructionFormat {
 
 pub(crate) trait InstructionEncoding {
     fn format(&self) -> InstructionFormat;
-    /// Returns the encoding in 32 bits as an u32
-    /// The bits where the registers should be are to be ignored
-    fn encoding(&self) -> u32;
-
-    /// The 6 Most Significant Bits of the instruction always represent the opcode
-    fn opcode(&self) -> Bits<6> {
-        // mask the rest of the encoding
-        Bits::new(self.encoding() & 0x1C000000)
-    }
-    //TODO: other fns like const for I ops and pseudo-addr for J
+    fn opcode(&self) -> Bits<6>;
 }
 
 #[derive(Debug, PartialEq, Eq, EnumString)]
