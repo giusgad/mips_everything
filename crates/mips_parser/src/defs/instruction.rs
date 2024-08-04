@@ -1,6 +1,8 @@
 use strum::EnumString;
 
-pub enum InstructionFormat {
+use super::Bits;
+
+pub(crate) enum InstructionFormat {
     /// opcode | rs | rt | rd | shamt | funct |
     /// 6 bits | 5  | 5  | 5  | 5     | 6     |
     R,
@@ -12,15 +14,24 @@ pub enum InstructionFormat {
     J,
 }
 
-pub trait InstructionEncoding {
+pub(crate) trait InstructionEncoding {
     fn format(&self) -> InstructionFormat;
-    fn opcode(&self) -> u8; //TODO: type
+    /// Returns the encoding in 32 bits as an u32
+    /// The bits where the registers should be are to be ignored
+    fn encoding(&self) -> u32;
+
+    /// The 6 Most Significant Bits of the instruction always represent the opcode
+    fn opcode(&self) -> Bits<6> {
+        // mask the rest of the encoding
+        Bits::new(self.encoding() & 0x1C000000)
+    }
+    //TODO: other fns like const for I ops and pseudo-addr for J
 }
 
 #[derive(Debug, PartialEq, Eq, EnumString)]
 #[strum(serialize_all = "lowercase")]
 /// All possible instructions
-pub enum Instruction {
+pub(crate) enum InstructionKind {
     /***** ARITHMETIC INSTRUCTIONS *****/
     /// Add Word
     Add,

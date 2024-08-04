@@ -3,6 +3,7 @@
 use errors::CompileError;
 use lexer::Lexer;
 
+mod defs;
 mod errors;
 mod lexer;
 mod parser;

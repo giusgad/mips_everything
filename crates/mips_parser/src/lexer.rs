@@ -1,11 +1,7 @@
+use crate::defs::register::Register;
 use std::num::IntErrorKind;
-
-use defs::TokenKind;
-
-use self::defs::{register::Register, Token};
+use crate::defs::{Token, TokenKind};
 use crate::errors::{LexerError, LexerErrorKind};
-
-pub(crate) mod defs;
 
 #[derive(Debug)]
 pub(crate) struct Lexer<'a> {
@@ -214,8 +210,8 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::defs::register::RegisterParseError;
-    use crate::lexer::defs::register::{RegisterName, RegisterPrefixedName};
+    use crate::defs::register::RegisterParseError;
+    use crate::defs::register::{RegisterName, RegisterPrefixedName};
 
     use super::*;
     #[test]

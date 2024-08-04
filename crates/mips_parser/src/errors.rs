@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::lexer::defs::register::RegisterParseError;
+use crate::defs::register::RegisterParseError;
 use ariadne::{sources, Config, IndexType, Label, Report, ReportKind};
 use thiserror::Error;
 
