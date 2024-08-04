@@ -1,8 +1,12 @@
+use instruction_encoding_derive::InstructionEncoding;
 use strum::EnumString;
 
 use super::Bits;
 
-pub(crate) enum InstructionFormat {
+/// The instruction format defines how the bits that compose it are interpreted.
+/// The three possible variants contain documentation for the respective bit layout.
+#[derive(Debug, PartialEq, Eq)]
+pub enum InstructionFormat {
     /// opcode | rs | rt | rd | shamt | funct |
     /// 6 bits | 5  | 5  | 5  | 5     | 6     |
     R,
@@ -14,9 +18,11 @@ pub(crate) enum InstructionFormat {
     J,
 }
 
-pub(crate) trait InstructionEncoding {
+/// Information on a specific instruction
+pub trait InstructionEncoding {
     fn format(&self) -> InstructionFormat;
     fn opcode(&self) -> Bits<6>;
+    fn funct(&self) -> Option<Bits<6>>;
 }
 
 #[derive(Debug, PartialEq, Eq, EnumString)]
@@ -25,6 +31,7 @@ pub(crate) trait InstructionEncoding {
 pub(crate) enum InstructionKind {
     /***** ARITHMETIC INSTRUCTIONS *****/
     /// Add Word
+    // #[instruction(opcode=0b010010, format=J)]
     Add,
     /// Add Immediate Word
     Addi,

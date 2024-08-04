@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use proc_macro::TokenStream;
 use syn::{token::Comma, Data, DeriveInput, Ident, LitInt};
 
@@ -7,12 +6,13 @@ use syn::{token::Comma, Data, DeriveInput, Ident, LitInt};
 struct VariantAttrs {
     opcode: u8,
     format: Ident,
+    funct: Option<u8>,
 }
 
 impl syn::parse::Parse for VariantAttrs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let opcode = input.parse::<LitInt>()?.base10_parse::<u8>()?;
-        let _ = input.parse::<Comma>()?;
+        input.parse::<Comma>()?;
         let format = input.parse::<Ident>()?;
         if !(format == "R" || format == "J" || format == "I") {
             return Err(syn::Error::new(
@@ -20,7 +20,31 @@ impl syn::parse::Parse for VariantAttrs {
                 "Invalid variant for instruction format.",
             ));
         }
-        Ok(VariantAttrs { opcode, format })
+        let funct = if input.peek(Comma) {
+            input.parse::<Comma>()?;
+            let funct = input.parse::<LitInt>()?.base10_parse::<u8>()?;
+            if format != "R" {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "Funct must not be specified for non R instructions.",
+                ));
+            }
+            Some(funct)
+        } else {
+            // there was no funct
+            if format == "R" {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "Required funct for R instructions.",
+                ));
+            }
+            None
+        };
+        Ok(VariantAttrs {
+            opcode,
+            format,
+            funct,
+        })
     }
 }
 
@@ -57,6 +81,16 @@ fn impl_encoding_trait(ast: DeriveInput) -> syn::Result<TokenStream> {
             quote::quote! {#enum_ident::#k => InstructionFormat::#format}
         })
         .collect::<Vec<_>>();
+    let funct_match = attrs
+        .iter()
+        .map(|(k, v)| {
+            if let Some(funct) = v.funct {
+                quote::quote! {#enum_ident::#k => Some(Bits::new(#funct as u32))}
+            } else {
+                quote::quote! {#enum_ident::#k => None}
+            }
+        })
+        .collect::<Vec<_>>();
     let opcode_match = attrs
         .into_iter()
         .map(|(k, v)| {
@@ -73,11 +107,27 @@ fn impl_encoding_trait(ast: DeriveInput) -> syn::Result<TokenStream> {
             fn opcode(&self) -> Bits<6> {
                 match self {#(#opcode_match),*}
             }
+            fn funct(&self) -> Option<Bits<6>> {
+                match self {#(#funct_match),*}
+            }
         }
     }
     .into())
 }
 
+/// This macro implements the [`mips_parser::defs::InstructionEncoding`] trait on an enum.
+/// Each variant must have an `#[instruction(opcode, format, funct)]` attribute.
+/// funct must only be specified if format is `R`.
+/// # Example
+/// ```ignore
+/// #[derive(InstructionEncoding)]
+/// enum Instruction {
+///     #[instruction(0b010010, R, 0b100000)]
+///     Add,
+///     #[instruction(0b010011, I)]
+///     Addi,
+/// }
+/// ```
 #[proc_macro_derive(InstructionEncoding, attributes(instruction))]
 pub fn instruction_encoding_derive_macro(item: TokenStream) -> TokenStream {
     let ast = syn::parse(item).unwrap();
