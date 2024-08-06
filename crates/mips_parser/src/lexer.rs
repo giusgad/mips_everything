@@ -1,7 +1,8 @@
+use crate::defs::instruction::InstructionKind;
 use crate::defs::register::Register;
-use std::num::IntErrorKind;
 use crate::defs::{Token, TokenKind};
 use crate::errors::{LexerError, LexerErrorKind};
+use std::num::IntErrorKind;
 
 #[derive(Debug)]
 pub(crate) struct Lexer<'a> {
@@ -49,7 +50,7 @@ impl<'a> Lexer<'a> {
             b',' => TokenKind::Comma,
             b':' => TokenKind::Colon,
             b'.' => TokenKind::Dot,
-            b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident(),
+            b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident_or_instruction(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
             c => {
@@ -135,7 +136,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Reads an ident, keeps going until an ascii whitespace character is found
-    fn read_ident(&mut self) -> Result<Token, LexerError> {
+    fn read_ident_or_instruction(&mut self) -> Result<Token, LexerError> {
         let mut string = String::new();
         let start = self.pos;
         while let Some(c) = self.peek() {
@@ -145,7 +146,13 @@ impl<'a> Lexer<'a> {
             string.push(*c as char);
             self.read_next();
         }
-        Ok(Token::new(TokenKind::Ident(string), start..self.pos))
+        let span = start..self.pos;
+        // try parsing the string as an instruction, if invalid return as ident
+        if let Ok(instruction) = string.parse::<InstructionKind>() {
+            Ok(Token::new(TokenKind::Instruction(instruction), span))
+        } else {
+            Ok(Token::new(TokenKind::Ident(string), span))
+        }
     }
 
     fn read_number(&mut self) -> Result<Token, LexerError> {
@@ -262,7 +269,7 @@ syscall
             )),
             TokenKind::Number(4),
             TokenKind::Newline,
-            TokenKind::Ident("syscall".into()),
+            TokenKind::Instruction("syscall".parse().unwrap()),
             TokenKind::Newline,
             TokenKind::Eof,
         ];
@@ -305,7 +312,7 @@ syscall
         let input = "lw $ra 4";
         let mut lexer = Lexer::new(input);
         let tokens = vec![
-            TokenKind::Ident("lw".into()),
+            TokenKind::Instruction("lw".parse().unwrap()),
             TokenKind::Register(Register::Name(RegisterName::Ra)),
             TokenKind::Number(4),
             TokenKind::Eof,

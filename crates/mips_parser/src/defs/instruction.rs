@@ -28,6 +28,7 @@ pub trait InstructionEncoding {
 #[derive(Debug, PartialEq, Eq, EnumString)]
 #[strum(serialize_all = "lowercase")]
 /// All possible instructions
+//TODO: pseudo-instructions
 pub(crate) enum InstructionKind {
     /***** ARITHMETIC INSTRUCTIONS *****/
     /// Add Word
@@ -225,8 +226,6 @@ pub(crate) enum InstructionKind {
     Tne,
     /// Trap if Not Equal Immediate
     Tnei,
-
-    //TODO: floating point arithmetic (probably in parser)
 
     /***** PRIVILEGED INSTRUCTIONS *****/
     /// Perform Cache Operation

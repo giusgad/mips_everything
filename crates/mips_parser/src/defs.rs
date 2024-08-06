@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use instruction::InstructionKind;
+
 use self::register::Register;
 
 pub mod instruction;
@@ -82,6 +84,7 @@ pub(crate) enum TokenKind {
     Colon,       // :
 
     Register(Register),
+    Instruction(InstructionKind),
     Ident(String),
     String(String),
     Number(i16),
