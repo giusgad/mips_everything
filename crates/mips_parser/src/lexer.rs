@@ -1,6 +1,6 @@
 use crate::defs::instruction::InstructionKind;
 use crate::defs::register::Register;
-use crate::defs::{Token, TokenKind};
+use crate::defs::token::{Token, TokenKind};
 use crate::errors::{LexerError, LexerErrorKind};
 use std::num::IntErrorKind;
 

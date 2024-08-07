@@ -1,4 +1,3 @@
-use instruction_encoding_derive::InstructionEncoding;
 use strum::EnumString;
 
 use super::Bits;
