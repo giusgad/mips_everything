@@ -19,32 +19,42 @@ syscall
         TokenKind::Newline,
         TokenKind::Ident("x".into()),
         TokenKind::Colon,
+        TokenKind::Whitespace,
         TokenKind::Directive(Directive::Word),
+        TokenKind::Whitespace,
         TokenKind::Number(7),
         TokenKind::Newline,
         TokenKind::Ident("y".into()),
         TokenKind::Colon,
+        TokenKind::Whitespace,
         TokenKind::Directive(Directive::Word),
+        TokenKind::Whitespace,
         TokenKind::Number(3),
         TokenKind::Newline,
         TokenKind::Directive(Directive::Text),
         TokenKind::Newline,
         TokenKind::Ident("la".into()),
+        TokenKind::Whitespace,
         TokenKind::Register(Register::PrefixedNumber(
             RegisterPrefixedName::new_unchecked('s', 0),
         )),
+        TokenKind::Whitespace,
         TokenKind::Ident("x".into()),
         TokenKind::Newline,
         TokenKind::Ident("la".into()),
+        TokenKind::Whitespace,
         TokenKind::Register(Register::PrefixedNumber(
             RegisterPrefixedName::new_unchecked('a', 0),
         )),
+        TokenKind::Whitespace,
         TokenKind::Ident("mylabel".into()),
         TokenKind::Newline,
         TokenKind::Ident("li".into()),
+        TokenKind::Whitespace,
         TokenKind::Register(Register::PrefixedNumber(
             RegisterPrefixedName::new_unchecked('v', 0),
         )),
+        TokenKind::Whitespace,
         TokenKind::Number(4),
         TokenKind::Newline,
         TokenKind::Instruction("syscall".parse().unwrap()),
@@ -60,17 +70,20 @@ syscall
 #[test]
 fn read_strings() {
     let input = r#"data "inside string"
-        out "inside \" escaped"
-        double "inside\"some\"double"
-        "#;
+out "inside \" escaped"
+double "inside\"some\"double"
+"#;
     let tokens = [
         TokenKind::Ident("data".into()),
+        TokenKind::Whitespace,
         TokenKind::String("inside string".into()),
         TokenKind::Newline,
         TokenKind::Ident("out".into()),
+        TokenKind::Whitespace,
         TokenKind::String("inside \" escaped".into()),
         TokenKind::Newline,
         TokenKind::Ident("double".into()),
+        TokenKind::Whitespace,
         TokenKind::String("inside\"some\"double".into()),
         TokenKind::Newline,
     ];
@@ -91,7 +104,9 @@ fn lex() {
     let mut lexer = Lexer::new(input);
     let tokens = vec![
         TokenKind::Instruction("lw".parse().unwrap()),
+        TokenKind::Whitespace,
         TokenKind::Register(Register::Name(RegisterName::Ra)),
+        TokenKind::Whitespace,
         TokenKind::Number(4),
         TokenKind::Eof,
     ];
@@ -123,9 +138,13 @@ fn parse_numbers() {
     let mut lexer = Lexer::new("3 12 0x1f 0b1101 0o12");
     let tokens = vec![
         TokenKind::Number(3),
+        TokenKind::Whitespace,
         TokenKind::Number(12),
+        TokenKind::Whitespace,
         TokenKind::Number(31),
+        TokenKind::Whitespace,
         TokenKind::Number(13),
+        TokenKind::Whitespace,
         TokenKind::Number(10),
         TokenKind::Eof,
     ];
@@ -188,9 +207,9 @@ fn invalid_chars() {
 fn comments() {
     let mut lexer = Lexer::new(
         "# Comment on line one
-            # some more comments on line two
-            # some more comments on line three
-            #",
+# some more comments on line two
+# some more comments on line three
+#",
     );
-    assert_eq!(lexer.lex(), Ok(vec![Token::new(TokenKind::Eof, 127..128)]));
+    assert_eq!(lexer.lex(), Ok(vec![Token::new(TokenKind::Eof, 91..92)]));
 }

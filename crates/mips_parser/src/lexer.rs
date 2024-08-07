@@ -97,17 +97,24 @@ impl<'a> Lexer<'a> {
         Ok(Token { kind, span: 0..1 })
     }
 
-    /// Increments the position until the next character to be read is not whitespace
-    /// If it finds a newline returns [`Token::Newline`].
-    /// The next character will be a non whitespace token.
+    /// Increments the position until the next character to be read is not whitespace.
+    /// If it finds a newline returns [`TokenKind::Newline`], if there is white space returns
+    /// [`TokenKind::Whitespace`]. The next character will be a non-whitespace token.
     fn skip_whitespace(&mut self) -> Option<Token> {
+        let start = self.pos;
+        let mut found_whitespace = false;
         while let Some(curr) = self.peek() {
             if *curr == 0xA {
                 self.read_next();
                 return Some(Token::new(TokenKind::Newline, self.pos - 1..self.pos));
             } else if !curr.is_ascii_whitespace() {
-                return None;
+                if found_whitespace {
+                    return Some(Token::new(TokenKind::Whitespace, start..self.pos));
+                } else {
+                    return None;
+                }
             }
+            found_whitespace = true;
             self.read_next();
         }
         None

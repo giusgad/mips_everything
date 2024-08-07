@@ -18,6 +18,7 @@ impl Token {
 pub(crate) enum TokenKind {
     Eof,
     Newline,
+    Whitespace,
 
     // parenthesis
     LParen, // (
