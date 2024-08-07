@@ -37,15 +37,22 @@ impl<'a> Lexer<'a> {
         if let Some(tok) = self.skip_whitespace() {
             return Ok(tok);
         }
-        let Some(curr) = self.peek() else {
-            return Ok(Token::new(TokenKind::Eof, 0..1));
+        let curr = match self.peek() {
+            // if the char is an # skip until the end of the line and analyze the next token
+            Some(b'#') => {
+                self.skip_comment();
+                return self.next_token();
+            }
+            Some(c) => c,
+            None => {
+                return Ok(Token::new(TokenKind::Eof, self.pos..self.pos + 1));
+            }
         };
         let kind = match curr {
             b'(' => TokenKind::LParen,
             b')' => TokenKind::RParen,
             b'"' => return self.read_string(),
             b'\'' => TokenKind::SingleQuote,
-            b'#' => TokenKind::Sharp,
             b'+' => TokenKind::Plus,
             b'-' => TokenKind::Minus,
             b',' => TokenKind::Comma,
@@ -101,6 +108,17 @@ impl<'a> Lexer<'a> {
             self.read_next();
         }
         None
+    }
+
+    /// Increments the position until a newline
+    fn skip_comment(&mut self) {
+        while let Some(curr) = self.peek() {
+            if *curr == 0xA {
+                self.read_next();
+                return;
+            }
+            self.read_next();
+        }
     }
 
     /// Returns the byte that would be read next without altering the state of the Lexer.
@@ -445,5 +463,16 @@ test";
                 span: 1..2
             })
         )
+    }
+
+    #[test]
+    fn comments() {
+        let mut lexer = Lexer::new(
+            "# Comment on line one
+            # some more comments on line two
+            # some more comments on line three
+            #",
+        );
+        assert_eq!(lexer.lex(), Ok(vec![Token::new(TokenKind::Eof, 127..128)]));
     }
 }

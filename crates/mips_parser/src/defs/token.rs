@@ -25,7 +25,6 @@ pub(crate) enum TokenKind {
 
     // punctuation and operators
     SingleQuote, // \'
-    Sharp,       // #
     Plus,        // +
     Minus,       // -
     Comma,       // ,
