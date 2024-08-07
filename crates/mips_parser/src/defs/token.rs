@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use super::{instruction::InstructionKind, register::Register};
+use super::{directive::Directive, instruction::InstructionKind, register::Register};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Token {
@@ -34,6 +34,7 @@ pub(crate) enum TokenKind {
 
     Register(Register),
     Instruction(InstructionKind),
+    Directive(Directive),
     Ident(String),
     String(String),
     Number(i16),

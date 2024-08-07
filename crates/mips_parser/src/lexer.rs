@@ -1,3 +1,4 @@
+use crate::defs::directive::Directive;
 use crate::defs::instruction::InstructionKind;
 use crate::defs::register::Register;
 use crate::defs::token::{Token, TokenKind};
@@ -49,7 +50,13 @@ impl<'a> Lexer<'a> {
             b'-' => TokenKind::Minus,
             b',' => TokenKind::Comma,
             b':' => TokenKind::Colon,
-            b'.' => TokenKind::Dot,
+            b'.' => {
+                if let Ok(tok) = self.read_directive() {
+                    return Ok(tok);
+                } else {
+                    TokenKind::Dot
+                }
+            }
             b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident_or_instruction(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
@@ -106,7 +113,7 @@ impl<'a> Lexer<'a> {
         let mut string = String::new();
         let mut escaped = false;
         // skip the " that starts the string
-        assert!(self.read_next().is_some_and(|c| c == b'"'));
+        assert_eq!(self.read_next(), Some(b'"'));
         while let Some(c) = self.peek() {
             if escaped {
                 escaped = false;
@@ -155,6 +162,27 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn read_directive(&mut self) -> Result<Token, ()> {
+        let mut string = String::new();
+        let start = self.pos;
+        // skip the `.`
+        assert_eq!(self.read_next(), Some(b'.'));
+        while let Some(c) = self.peek() {
+            if !c.is_ascii_alphanumeric() {
+                break;
+            }
+            string.push(*c as char);
+            self.read_next();
+        }
+        // try parsing the string as a directive, if invalid reset the position and return error
+        if let Ok(directive) = string.parse::<Directive>() {
+            Ok(Token::new(TokenKind::Directive(directive), start..self.pos))
+        } else {
+            self.pos = start;
+            Err(())
+        }
+    }
+
     fn read_number(&mut self) -> Result<Token, LexerError> {
         let start = self.pos;
         let mut string = String::new();
@@ -193,7 +221,7 @@ impl<'a> Lexer<'a> {
         let start = self.pos;
         let mut chars = Vec::new();
         // skip the $ itself
-        self.read_next();
+        assert_eq!(self.read_next(), Some(b'$'));
         while let Some(c) = self.peek() {
             if !c.is_ascii_alphanumeric() {
                 break;
@@ -217,6 +245,7 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::defs::directive::Directive;
     use crate::defs::register::RegisterParseError;
     use crate::defs::register::{RegisterName, RegisterPrefixedName};
 
@@ -233,23 +262,19 @@ li $v0 4
 syscall			
 ";
         let tokens = [
-            TokenKind::Dot,
-            TokenKind::Ident("data".into()),
+            TokenKind::Directive(Directive::Data),
             TokenKind::Newline,
             TokenKind::Ident("x".into()),
             TokenKind::Colon,
-            TokenKind::Dot,
-            TokenKind::Ident("word".into()),
+            TokenKind::Directive(Directive::Word),
             TokenKind::Number(7),
             TokenKind::Newline,
             TokenKind::Ident("y".into()),
             TokenKind::Colon,
-            TokenKind::Dot,
-            TokenKind::Ident("word".into()),
+            TokenKind::Directive(Directive::Word),
             TokenKind::Number(3),
             TokenKind::Newline,
-            TokenKind::Dot,
-            TokenKind::Ident("text".into()),
+            TokenKind::Directive(Directive::Text),
             TokenKind::Newline,
             TokenKind::Ident("la".into()),
             TokenKind::Register(Register::PrefixedNumber(
