@@ -30,7 +30,9 @@ impl CompileError {
         let mut report = Report::build(
             ReportKind::Error,
             file_name.clone(),
-            self.get_span().next().unwrap(),
+            self.get_span()
+                .next()
+                .expect("Error span should be pointing to at least one byte."),
         )
         .with_config(Config::default().with_index_type(IndexType::Byte))
         .with_message(self.general_message());
@@ -87,10 +89,12 @@ impl LexerError {
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum LexerErrorKind {
-    #[error("Invalid register: {0}")]
+    #[error("Invalid register: {0}.")]
     Register(#[from] RegisterParseError),
-    #[error("Invalid token: \"{0}\"")]
+    #[error("Invalid token: \"{0}\".")]
     InvalidToken(char),
+    #[error("Non ascii character.")]
+    NonAsciiChar,
     #[error("Expected string closing delimiter.")]
     ExpectedStringEnd,
     #[error("Number literal is invalid.")]
@@ -107,6 +111,7 @@ impl AriadneError for LexerErrorKind {
         match self {
             LexerErrorKind::Register(err) => err.label(),
             LexerErrorKind::InvalidToken(_) => "This token is invalid".into(),
+            LexerErrorKind::NonAsciiChar => "This token is invalid as its not ascii".into(),
             LexerErrorKind::ExpectedStringEnd => "The string should be closed".into(),
             LexerErrorKind::NumberParseError => "This number/address is not valid".into(),
             LexerErrorKind::NumberOutOfRange => "This number is out of range".into(),

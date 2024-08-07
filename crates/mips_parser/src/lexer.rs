@@ -60,10 +60,26 @@ impl<'a> Lexer<'a> {
             b'a'..=b'z' | b'A'..=b'Z' => return self.read_ident_or_instruction(),
             b'0'..=b'9' => return self.read_number(),
             b'$' => return self.read_register(),
+            c if !c.is_ascii() => {
+                // get the lenght of the non ascii character by checking the leading byte
+                let length = if c & 0b1110_0000 == 0b1100_0000 {
+                    2
+                } else if c & 0b1111_0000 == 0b1110_0000 {
+                    3
+                } else if c & 0b1111_1000 == 0b1111_0000 {
+                    4
+                } else {
+                    panic!("Invalid UTF-8 leading byte");
+                };
+                return Err(LexerError::new(
+                    LexerErrorKind::NonAsciiChar,
+                    self.pos..self.pos + length,
+                ));
+            }
             c => {
                 return Err(LexerError::new(
                     LexerErrorKind::InvalidToken(*c as char),
-                    self.pos..self.pos,
+                    self.pos..self.pos + 1,
                 ))
             }
         };
@@ -403,5 +419,31 @@ test";
                 })
             );
         }
+    }
+
+    #[test]
+    fn invalid_chars() {
+        // 4, 3, 2 bytes respectively
+        let strs = [" 😂 .text", "test €", "un è"];
+        let ranges = [1..5, 5..8, 3..5];
+        for (s, span) in strs.into_iter().zip(ranges.into_iter()) {
+            let mut lexer = Lexer::new(s);
+            assert_eq!(
+                lexer.lex(),
+                Err(LexerError {
+                    kind: LexerErrorKind::NonAsciiChar,
+                    span,
+                })
+            );
+        }
+
+        let mut lexer = Lexer::new("s~");
+        assert_eq!(
+            lexer.lex(),
+            Err(LexerError {
+                kind: LexerErrorKind::InvalidToken('~'),
+                span: 1..2
+            })
+        )
     }
 }
