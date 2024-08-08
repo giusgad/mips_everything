@@ -2,6 +2,7 @@
 
 use errors::CompileError;
 use lexer::Lexer;
+use parser::Parser;
 
 pub mod defs;
 mod errors;
@@ -18,8 +19,8 @@ impl<'a> MipsCompiler<'a> {
     }
     pub fn compile(self) -> Result<(), CompileError> {
         //TODO: bring every part together
-        let _tokens = Lexer::new(self.input).lex()?;
-        dbg!(_tokens);
+        let tokens = Lexer::new(self.input).lex()?;
+        let parser = Parser::new(&tokens);
         Ok(())
     }
 }

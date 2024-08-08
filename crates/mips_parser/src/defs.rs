@@ -2,6 +2,7 @@ pub mod instruction;
 pub(crate) mod register;
 pub(crate) mod token;
 pub(crate) mod directive;
+pub mod program;
 
 pub(crate) trait ValidBitRepr {}
 impl ValidBitRepr for Bits<32> {}
